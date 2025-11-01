@@ -1,4 +1,4 @@
-export const Stream_Pay_ABI = [
+export const STREAM_PAY_ABI = [
     {
       "inputs": [
         {
