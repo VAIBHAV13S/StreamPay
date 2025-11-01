@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";  // Added for security
-import "../interfaces/IPayStream.sol";
+import "../interfaces/IStreamPay.sol";
 
 /**
  * @title StreamFactory
@@ -12,7 +12,7 @@ import "../interfaces/IPayStream.sol";
  */
 contract StreamFactory is Ownable, ReentrancyGuard {  // Added ReentrancyGuard
 
-    IPayStream public immutable payStream;
+    IStreamPay public immutable streamPay;
 
     // Stream template structure
     struct StreamTemplate {
@@ -83,9 +83,9 @@ contract StreamFactory is Ownable, ReentrancyGuard {  // Added ReentrancyGuard
     event TemplateDeactivated(uint256 indexed templateId);
     event ConfigUpdated(uint256 creationFee, uint256 maxTemplates);
 
-    constructor(address _payStream, address initialOwner) Ownable(initialOwner) {
-        require(_payStream != address(0), "StreamFactory: Invalid PayStream address");
-        payStream = IPayStream(_payStream);
+    constructor(address _streamPay, address initialOwner) Ownable(initialOwner) {
+        require(_streamPay != address(0), "StreamFactory: Invalid StreamPay address");
+        streamPay = IStreamPay(_streamPay);
         
         // Create default rate presets
         _createDefaultPresets();
@@ -157,7 +157,7 @@ contract StreamFactory is Ownable, ReentrancyGuard {  // Added ReentrancyGuard
         require(msg.value >= totalAmount, "StreamFactory: Insufficient payment");
 
         // CRITICAL FIX: Capture the returned stream ID
-        uint256 streamId = payStream.createStream{value: totalAmount}(
+        uint256 streamId = streamPay.createStream{value: totalAmount}(
             recipient,
             duration,
             template.streamType,

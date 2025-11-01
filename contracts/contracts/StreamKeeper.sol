@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-import "../interfaces/IPayStream.sol";
+import "../interfaces/IStreamPay.sol";
 
 /**
  * @title StreamKeeper
@@ -12,7 +12,7 @@ import "../interfaces/IPayStream.sol";
  */
 contract StreamKeeper is Ownable, Pausable {
     
-    IPayStream public immutable payStream;
+    IStreamPay public immutable streamPay;
     
     // Keeper configuration
     uint256 public updateInterval = 1; // seconds
@@ -57,9 +57,9 @@ contract StreamKeeper is Ownable, Pausable {
         _;
     }
     
-    constructor(address _payStream, address initialOwner) Ownable(initialOwner) {
-        require(_payStream != address(0), "StreamKeeper: Invalid PayStream address");
-        payStream = IPayStream(_payStream);
+    constructor(address _streamPay, address initialOwner) Ownable(initialOwner) {
+        require(_streamPay != address(0), "StreamKeeper: Invalid StreamPay address");
+        streamPay = IStreamPay(_streamPay);
         
         // Owner is initially authorized keeper
         authorizedKeepers[initialOwner] = true;
@@ -114,7 +114,7 @@ contract StreamKeeper is Ownable, Pausable {
     function _executeUpdate() external returns (uint256 processed) {
         require(msg.sender == address(this), "StreamKeeper: Internal function");
         
-        uint256[] memory activeStreamIds = payStream.getActiveStreamIds();
+        uint256[] memory activeStreamIds = streamPay.getActiveStreamIds();
         uint256 totalStreams = activeStreamIds.length;
         
         if (totalStreams == 0) {
@@ -139,7 +139,7 @@ contract StreamKeeper is Ownable, Pausable {
             }
             
             // Process batch
-            payStream.batchUpdateStreams(batch);
+            streamPay.batchUpdateStreams(batch);
             processedStreams += batch.length;
             
             // Gas check - if we're running low, stop here
@@ -155,7 +155,7 @@ contract StreamKeeper is Ownable, Pausable {
      * @dev Check if upkeep is needed (for automation systems)
      * @return upkeepNeeded Whether upkeep should be performed
      * @return performData Data to pass to performUpkeep (empty for now)
-     * Fixed: Corrected typo "somniatream" to "payStream"
+     * Fixed: Corrected typo "somniatream" to "streamPay"
      */
     function checkUpkeep(bytes calldata /* checkData */) 
         external 
@@ -166,7 +166,7 @@ contract StreamKeeper is Ownable, Pausable {
             !paused() &&
             !isUpdating &&
             block.timestamp >= lastUpdateTime + updateInterval &&
-            payStream.getActiveStreamIds().length > 0
+            streamPay.getActiveStreamIds().length > 0
         );
         performData = "";
     }
@@ -189,7 +189,7 @@ contract StreamKeeper is Ownable, Pausable {
             totalGasUsed,
             averageGasPerStream,
             lastUpdateTime,
-            payStream.getActiveStreamIds().length,
+            streamPay.getActiveStreamIds().length,
             !paused() && !isUpdating
         );
     }
@@ -198,7 +198,7 @@ contract StreamKeeper is Ownable, Pausable {
      * @dev Calculate estimated gas cost for next update cycle
      */
     function estimateNextUpdateCost() external view returns (uint256 estimatedGas) {
-        uint256[] memory activeStreams = payStream.getActiveStreamIds();
+        uint256[] memory activeStreams = streamPay.getActiveStreamIds();
         uint256 totalStreams = activeStreams.length;
         
         if (totalStreams == 0) {
@@ -262,7 +262,7 @@ contract StreamKeeper is Ownable, Pausable {
     function emergencyUpdateStream(uint256 streamId) external onlyOwner {
         uint256[] memory singleStream = new uint256[](1);
         singleStream[0] = streamId;
-        payStream.batchUpdateStreams(singleStream);
+        streamPay.batchUpdateStreams(singleStream);
     }
     
     // View functions for monitoring
@@ -271,7 +271,7 @@ contract StreamKeeper is Ownable, Pausable {
             !paused() &&
             !isUpdating &&
             block.timestamp >= lastUpdateTime + updateInterval &&
-            payStream.getActiveStreamIds().length > 0
+            streamPay.getActiveStreamIds().length > 0
         );
     }
     
@@ -280,7 +280,7 @@ contract StreamKeeper is Ownable, Pausable {
     }
     
     function getActiveStreamCount() external view returns (uint256) {
-        return payStream.getActiveStreamIds().length;
+        return streamPay.getActiveStreamIds().length;
     }
     
     function isKeeperAuthorized(address keeper) external view returns (bool) {

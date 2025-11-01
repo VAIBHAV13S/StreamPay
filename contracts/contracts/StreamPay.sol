@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
- * @title PayStream
+ * @title StreamPay
  * @dev Main contract for real-time per-second payment streams on Somnia
  * @notice This contract enables true per-second money flows updated on-chain in real-time
  */
-contract PayStream is ReentrancyGuard, Ownable, Pausable {
+contract StreamPay is ReentrancyGuard, Ownable, Pausable {
     
     struct Stream {
         address sender;                 // Who's paying
@@ -93,7 +93,7 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
     event KeeperUpdated(address indexed oldKeeper, address indexed newKeeper);
 
     modifier onlyKeeper() {
-        require(msg.sender == keeper, "PayStream: Only keeper can call this");
+        require(msg.sender == keeper, "StreamPay: Only keeper can call this");
         _;
     }
 
@@ -114,18 +114,18 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
         string memory streamType,
         string memory description
     ) external payable nonReentrant whenNotPaused returns (uint256 streamId) {
-        require(msg.value > 0, "PayStream: Amount must be greater than 0");
-        require(recipient != address(0), "PayStream: Invalid recipient");
-        require(recipient != msg.sender, "PayStream: Cannot stream to yourself");
-        require(duration > 0, "PayStream: Duration must be greater than 0");
-        require(duration <= 365 days, "PayStream: Duration too long");
-        require(bytes(streamType).length > 0, "PayStream: Stream type required");
+        require(msg.value > 0, "StreamPay: Amount must be greater than 0");
+        require(recipient != address(0), "StreamPay: Invalid recipient");
+        require(recipient != msg.sender, "StreamPay: Cannot stream to yourself");
+        require(duration > 0, "StreamPay: Duration must be greater than 0");
+        require(duration <= 365 days, "StreamPay: Duration too long");
+        require(bytes(streamType).length > 0, "StreamPay: Stream type required");
 
         // Fixed: Added minimum amount check to prevent precision loss
-        require(msg.value >= duration, "PayStream: Amount too small for duration");
+        require(msg.value >= duration, "StreamPay: Amount too small for duration");
         
         uint256 flowRate = msg.value / duration;
-        require(flowRate > 0, "PayStream: Flow rate too low");
+        require(flowRate > 0, "StreamPay: Flow rate too low");
 
         streamId = nextStreamId++;
         uint256 startTime = block.timestamp;
@@ -182,10 +182,10 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
         nonReentrant 
         whenNotPaused 
     {
-        require(streamIds.length <= MAX_BATCH_SIZE, "PayStream: Batch too large");
+        require(streamIds.length <= MAX_BATCH_SIZE, "StreamPay: Batch too large");
         require(
             block.timestamp >= lastBatchUpdateTime + MIN_UPDATE_INTERVAL, 
-            "PayStream: Too frequent updates"
+            "StreamPay: Too frequent updates"
         );
         
         uint256 gasStart = gasleft();
@@ -278,19 +278,19 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
      */
     function withdrawFromStream(uint256 streamId) external nonReentrant whenNotPaused {
         Stream storage stream = streams[streamId];
-        require(stream.isActive, "PayStream: Stream not active");
-        require(msg.sender == stream.recipient, "PayStream: Not the recipient");
+        require(stream.isActive, "StreamPay: Stream not active");
+        require(msg.sender == stream.recipient, "StreamPay: Not the recipient");
         
         // Update stream balance first
         _updateStreamBalance(streamId);
         
         uint256 withdrawableAmount = stream.realTimeBalance - stream.amountWithdrawn;
-        require(withdrawableAmount > 0, "PayStream: No funds to withdraw");
+        require(withdrawableAmount > 0, "StreamPay: No funds to withdraw");
 
         stream.amountWithdrawn += withdrawableAmount;
         
         (bool success, ) = payable(stream.recipient).call{value: withdrawableAmount}("");
-        require(success, "PayStream: Transfer failed");
+        require(success, "StreamPay: Transfer failed");
 
         emit Withdrawn(streamId, stream.recipient, withdrawableAmount, block.timestamp);
     }
@@ -301,10 +301,10 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
      */
     function cancelStream(uint256 streamId) external nonReentrant whenNotPaused {
         Stream storage stream = streams[streamId];
-        require(stream.isActive, "PayStream: Stream already inactive");
+        require(stream.isActive, "StreamPay: Stream already inactive");
         require(
             msg.sender == stream.sender || msg.sender == stream.recipient,
-            "PayStream: Unauthorized"
+            "StreamPay: Unauthorized"
         );
         
         // Update balance before cancellation
@@ -319,12 +319,12 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
         // Transfer funds
         if (recipientBalance > 0) {
             (bool success, ) = payable(stream.recipient).call{value: recipientBalance}("");
-            require(success, "PayStream: Recipient transfer failed");
+            require(success, "StreamPay: Recipient transfer failed");
         }
         
         if (senderRefund > 0) {
             (bool success, ) = payable(stream.sender).call{value: senderRefund}("");
-            require(success, "PayStream: Sender refund failed");
+            require(success, "StreamPay: Sender refund failed");
         }
         
         emit StreamCancelled(streamId, stream.sender, stream.recipient, senderRefund, recipientBalance);
@@ -410,7 +410,7 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
     
     // Admin functions
     function setKeeper(address newKeeper) external onlyOwner {
-        require(newKeeper != address(0), "PayStream: Invalid keeper address");
+        require(newKeeper != address(0), "StreamPay: Invalid keeper address");
         address oldKeeper = keeper;
         keeper = newKeeper;
         emit KeeperUpdated(oldKeeper, newKeeper);
@@ -427,11 +427,11 @@ contract PayStream is ReentrancyGuard, Ownable, Pausable {
     // Emergency functions
     function emergencyWithdraw() external onlyOwner whenPaused {
         (bool success, ) = payable(owner()).call{value: address(this).balance}("");
-        require(success, "PayStream: Emergency withdrawal failed");
+        require(success, "StreamPay: Emergency withdrawal failed");
     }
 
     // Added: Receive function to handle direct ETH transfers
     receive() external payable {
-        revert("PayStream: Direct ETH transfers not allowed. Use createStream()");
+        revert("StreamPay: Direct ETH transfers not allowed. Use createStream()");
     }
 }
