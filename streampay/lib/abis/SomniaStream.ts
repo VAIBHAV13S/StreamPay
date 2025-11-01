@@ -1,4 +1,4 @@
-export const SOMNIA_STREAM_ABI = [
+export const Stream_Pay_ABI = [
     {
       "inputs": [
         {
